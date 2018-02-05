@@ -428,7 +428,7 @@ pub struct sockaddr_conn {
 fn bindgen_test_layout_sockaddr_conn() {
     assert_eq!(
         ::std::mem::size_of::<sockaddr_conn>(),
-        12usize,
+        16usize,
         concat!("Size of: ", stringify!(sockaddr_conn))
     );
     assert_eq!(
@@ -448,7 +448,7 @@ fn bindgen_test_layout_sockaddr_conn() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<sockaddr_conn>())).sconn_port as *const _ as usize },
-        1usize,
+        2usize,
         concat!(
             "Offset of field: ",
             stringify!(sockaddr_conn),
@@ -458,7 +458,7 @@ fn bindgen_test_layout_sockaddr_conn() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<sockaddr_conn>())).sconn_addr as *const _ as usize },
-        4usize,
+        8usize,
         concat!(
             "Offset of field: ",
             stringify!(sockaddr_conn),
