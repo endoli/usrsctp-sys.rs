@@ -63,6 +63,9 @@
 //! The return code is 0 on success and -1 in case of an error.
 
 #![allow(non_camel_case_types)]
+#![cfg_attr(feature = "cargo-clippy",
+            allow(decimal_literal_representation, new_without_default_derive,
+                  should_implement_trait, unreadable_literal, useless_transmute))]
 
 extern crate libc;
 
