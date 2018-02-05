@@ -4,11 +4,12 @@ version = "0.1.0"
 authors = ["Bruce Mitchener <bruce.mitchener@gmail.com>"]
 license = "MIT/Apache-2.0"
 readme = "README.md"
-description = ""
-keywords = ["sctp", "networking"]
+description = "Bindings for the `usrsctp` library, providing SCTP networking."
+keywords = ["sctp", "network", "networking"]
 homepage = "https://github.com/endoli/usrsctp.rs"
 repository = "https://github.com/endoli/usrsctp.rs"
 documentation = "https://endoli.github.io/usrsctp.rs/"
+categories = ["external-ffi-bindings", "network-programming"]
 
 links = "usrsctp"
 build = "build.rs"
