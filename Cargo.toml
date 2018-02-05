@@ -1,0 +1,20 @@
+[package]
+name = "usrsctp-sys"
+version = "0.1.0"
+authors = ["Bruce Mitchener <bruce.mitchener@gmail.com>"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+description = ""
+keywords = ["sctp", "networking"]
+homepage = "https://github.com/endoli/usrsctp.rs"
+repository = "https://github.com/endoli/usrsctp.rs"
+documentation = "https://endoli.github.io/usrsctp.rs/"
+
+links = "usrsctp"
+build = "build.rs"
+
+[dependencies]
+libc = "0.2.36"
+
+[build-dependencies]
+cmake = "0.1"
