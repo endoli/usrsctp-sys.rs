@@ -348,7 +348,8 @@ fn bindgen_test_layout_sctp_common_header() {
         )
     );
 }
-#[cfg(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
+#[cfg(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly",
+          target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sockaddr_conn {
@@ -357,7 +358,8 @@ pub struct sockaddr_conn {
     pub sconn_port: u16,
     pub sconn_addr: *mut ::std::os::raw::c_void,
 }
-#[cfg(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
+#[cfg(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly",
+          target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
 #[test]
 fn bindgen_test_layout_sockaddr_conn() {
     assert_eq!(
@@ -411,7 +413,8 @@ fn bindgen_test_layout_sockaddr_conn() {
         )
     );
 }
-#[cfg(not(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd")))]
+#[cfg(not(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly",
+              target_os = "freebsd", target_os = "openbsd", target_os = "netbsd")))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sockaddr_conn {
@@ -419,7 +422,8 @@ pub struct sockaddr_conn {
     pub sconn_port: u16,
     pub sconn_addr: *mut ::std::os::raw::c_void,
 }
-#[cfg(not(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd")))]
+#[cfg(not(any(target_os = "macos", target_os = "bitrig", target_os = "dragonfly",
+              target_os = "freebsd", target_os = "openbsd", target_os = "netbsd")))]
 #[test]
 fn bindgen_test_layout_sockaddr_conn() {
     assert_eq!(
