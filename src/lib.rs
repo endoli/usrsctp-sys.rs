@@ -16,13 +16,42 @@
 //! and sequence numbers. A selective retransmission mechanism is
 //! applied to correct loss or corruption of data.
 //!
-//! In this manual the socket API for the SCTP User-land implementation
-//! will be described.  It is based on [RFC 6458](http://tools.ietf.org/html/rfc6458).
+//! The API for the SCTP User-land implementation is based on
+//! [RFC 6458](http://tools.ietf.org/html/rfc6458).
 //! The main focus of this document is on pointing out the differences
 //! to the SCTP Sockets API. For all aspects of the sockets API that
-//! are not mentioned in this document, please refer to
+//! are not mentioned in this documentation, please refer to
 //! [RFC 6458](http://tools.ietf.org/html/rfc6458). Questions about
-//! SCTP itself can hopefully be answered by [RFC 4960](http://tools.ietf.org/html/rfc4960).
+//! SCTP itself can hopefully be answered by
+//! [RFC 4960](http://tools.ietf.org/html/rfc4960).
+//!
+//! This library provides bindings for the [`usrsctp` library] which
+//! provides a userland implementation of SCTP that doesn't require
+//! any special support from the underlying operating system or
+//! kernel, beyond a normal networking stack. The `usrsctp` library
+//! is widely used on a variety of platforms.
+//!
+//! ## Installation
+//!
+//! This crate works with Cargo and is on
+//! [crates.io](https://crates.io/crates/usrsctp-sys/).
+//! Add it to your `Cargo.toml` like so:
+//!
+//! ```toml
+//! [dependencies]
+//! usrsctp-sys = "0.1.0"
+//! ```
+//!
+//! Then, let `rustc` know that you're going to use this crate at the
+//! top of your own crate:
+//!
+//! ```
+//! extern crate usrsctp_sys;
+//! # fn main() {}
+//! ```
+//!
+//! The crate bundles a copy of the underlying [`usrsctp` library] and
+//! will handle building it when using this crate.
 //!
 //! ## Basic Operations
 //!
@@ -32,35 +61,37 @@
 //!
 //! ## Differences to RFC 6458
 //!
-//! ### usrsctp_init()
+//! * [`usrsctp_init()`]: Not in RFC.
+//! * [`usrsctp_finish()`]: Not in RFC.
+//! * [`usrsctp_socket()`]: Additional arguments for callback-driven I/O.
+//! * [`usrsctp_close()`]: No return value as in the RFC.
 //!
-//! Every application has to start with `usrsctp_init()`. This function
-//! calls `sctp_init()` and reserves the memory necessary to administer
-//! the data transfer. The function prototype is
+//! Additionally, while the RFC discusses many functions for sending and
+//! receiving data, all but two are deprecated. These deprecated functions
+//! are not available within `usrsctp-sys`:
 //!
-//! ```c
-//! void usrsctp_init(uint16_t udp_port)
-//! ```
+//! * `sctp_recvmsg`
+//! * `sctp_send`
+//! * `sctp_sendmsg`
+//! * `sctp_sendx`
 //!
-//! As it is not always possible to send data directly over SCTP because
-//! not all NAT boxes can process SCTP packets, the data can be sent over
-//! UDP. To encapsulate SCTP into UDP a UDP port has to be specified, to
-//! which the datagrams can be sent. This local UDP port  is set with
-//! the parameter `udp_port`. The default value is `9899`, the standard
-//! UDP encapsulation port. If UDP encapsulation is not necessary, the
-//! UDP port has to be set to `0`.
+//! These functions may be used:
 //!
-//! ### usrsctp_finish()
+//! * [`usrsctp_recvv()`]
+//! * [`usrsctp_sendv()`]
 //!
-//! At the end of the program `usrsctp_finish()` should be called to
-//! free all the memory that has been allocated before. The function
-//! prototype is
+//! Additionally, since sockets are not raw file descriptors, standard functions
+//! like [`read()`] and [`write()`] may not be used.
 //!
-//! ```c
-//! int usrsctp_finish(void)
-//! ```
-//!
-//! The return code is 0 on success and -1 in case of an error.
+//! [`usrsctp` library]: https://github.com/sctplab/usrsctp
+//! [`usrsctp_init()`]: fn.usrsctp_init.html
+//! [`usrsctp_finish()`]: fn.usrsctp_finish.html
+//! [`usrsctp_socket()`]: fn.usrsctp_socket.html
+//! [`usrsctp_close()`]: fn.usrsctp_close.html
+//! [`usrsctp_recvv()`]: fn.usrsctp_recvv.html
+//! [`usrsctp_sendv()`]: fn.usrsctp_sendv.html
+//! [`read()`]: ../libc/fn.read.html
+//! [`write()`]: ../libc/fn.write.html
 
 #![allow(non_camel_case_types)]
 #![cfg_attr(feature = "cargo-clippy",

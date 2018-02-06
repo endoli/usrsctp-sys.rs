@@ -259,9 +259,20 @@ pub const SCTP_STREAM_RESET: ::std::os::raw::c_uint = 130;
 pub const SCTP_PAD_CHUNK: ::std::os::raw::c_uint = 132;
 pub const SCTP_FORWARD_CUM_TSN: ::std::os::raw::c_uint = 192;
 pub const SCTP_ASCONF: ::std::os::raw::c_uint = 193;
+/// Standard TCP Congestion Control
 pub const SCTP_CC_RFC2581: ::std::os::raw::c_uint = 0;
+/// High Speed TCP Congestion Control (Floyd)
 pub const SCTP_CC_HSTCP: ::std::os::raw::c_uint = 1;
+/// H-TCP Congestion Control
+///
+/// H-TCP is a congestion control algorithm optimized for high speed networks
+/// with low latency.
+///
+/// See [Wikipedia](https://en.wikipedia.org/wiki/H-TCP) for an overview and
+/// the [Hamilton Institute project page](http://www.hamilton.ie/net/htcp.htm)
+/// for detailed information.
 pub const SCTP_CC_HTCP: ::std::os::raw::c_uint = 2;
+/// RTCC Congestion Control - RFC2581 plus
 pub const SCTP_CC_RTCC: ::std::os::raw::c_uint = 3;
 pub const SCTP_CC_OPT_RTCC_SETMODE: ::std::os::raw::c_uint = 8192;
 pub const SCTP_CC_OPT_USE_DCCC_EC: ::std::os::raw::c_uint = 8193;
@@ -272,13 +283,21 @@ pub const SCTP_CMT_RPV1: ::std::os::raw::c_uint = 2;
 pub const SCTP_CMT_RPV2: ::std::os::raw::c_uint = 3;
 pub const SCTP_CMT_MPTCP: ::std::os::raw::c_uint = 4;
 pub const SCTP_CMT_MAX: ::std::os::raw::c_uint = 4;
+/// Stream scheduling: default simple round-robin.
 pub const SCTP_SS_DEFAULT: ::std::os::raw::c_uint = 0;
+/// Stream scheduling: real round-robin.
 pub const SCTP_SS_ROUND_ROBIN: ::std::os::raw::c_uint = 1;
+/// Stream scheduling: real round-robin per packet.
 pub const SCTP_SS_ROUND_ROBIN_PACKET: ::std::os::raw::c_uint = 2;
+/// Stream scheduling: priority.
 pub const SCTP_SS_PRIORITY: ::std::os::raw::c_uint = 3;
+/// Stream scheduling: fair bandwidth.
 pub const SCTP_SS_FAIR_BANDWITH: ::std::os::raw::c_uint = 4;
+/// Stream scheduling: first come, first serve.
 pub const SCTP_SS_FIRST_COME: ::std::os::raw::c_uint = 5;
+/// Flag for use with [`usrsctp_bindx()`](fn.usrsctp_bindx.html) to bind addresses.
 pub const SCTP_BINDX_ADD_ADDR: ::std::os::raw::c_uint = 32769;
+/// Flag for use with [`usrsctp_bindx()`](fn.usrsctp_bindx.html) to unbind addresses.
 pub const SCTP_BINDX_REM_ADDR: ::std::os::raw::c_uint = 32770;
 pub const SCTP_DUMP_OUTBOUND: ::std::os::raw::c_uint = 1;
 pub const SCTP_DUMP_INBOUND: ::std::os::raw::c_uint = 0;
@@ -3601,14 +3620,38 @@ fn bindgen_test_layout_sctp_prstatus() {
         )
     );
 }
+/// Opaque struct representing an SCTP endpoint.
+///
+/// A socket is created using [`usrsctp_socket()`].
+///
+/// [`usrsctp_socket()`]: fn.usrsctp_socket.html
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct socket {
     _unused: [u8; 0],
 }
 extern "C" {
+    /// Every application has to start with `usrsctp_init()`. This function
+    /// reserves the memory necessary to administer the data transfer.
+    ///
+    /// As it is not always possible to send data directly over SCTP because
+    /// not all NAT boxes can process SCTP packets, the data can be sent over
+    /// UDP. To encapsulate SCTP into UDP a UDP port has to be specified, to
+    /// which the datagrams can be sent. This local UDP port is set with
+    /// the parameter `udp_port`. The default value is `9899`, the standard
+    /// UDP encapsulation port. If UDP encapsulation is not necessary, the
+    /// UDP port has to be set to `0`.
+    ///
+    /// ```
+    /// # use usrsctp_sys::*;
+    /// unsafe { usrsctp_init(9899, None, None) };
+    /// ```
+    ///
+    /// See also:
+    ///
+    /// * [`usrsctp_finish()`](fn.usrsctp_finish.html)
     pub fn usrsctp_init(
-        arg1: u16,
+        udp_port: u16,
         arg2: ::std::option::Option<
             unsafe extern "C" fn(
                 addr: *mut ::std::os::raw::c_void,
@@ -3622,9 +3665,64 @@ extern "C" {
             unsafe extern "C" fn(format: *const ::std::os::raw::c_char, ...),
         >,
     );
+
+    /// Create an SCTP endpoint.
+    ///
+    /// * `domain`: Either [`PF_INET`] or [`PF_INET6`]. Using the `PF_INET`
+    ///   domain indicates the creation of an endpoint that
+    ///   can use only IPv4 addresses, while `PF_INET6` creates an endpoint
+    ///   that can use both IPv6 and IPv4 addresses.
+    /// * `socket_type`: In the case of a one-to-many style socket, it is
+    ///   [`SOCK_SEQPACKET`]. In the case of a one-to-one style socket,
+    ///   it is [`SOCK_STREAM`]. For an explanation of the differences
+    ///   between socket types, please refer to [RFC 6458].
+    /// * `protocol`: Set to [`IPPROTO_SCTP`].
+    ///
+    /// In `usrsctp`, a callback API can be used.
+    ///
+    /// * `receive_cb`: The receive callback.
+    /// * `send_cb`: The send callback.
+    /// * `sb_threshold`: The amount of free space in the send socket
+    ///   buffer before the send function in the application is called.
+    ///   If the `send_cb` is given (not `None`) and `sb_threshold` is `0`,
+    ///   the function is called whenever there is room in the send socket
+    ///   buffer.
+    ///
+    /// On success, returns the pointer to the new socket. In case of a failure,
+    /// a null pointer is returned and `errno` is set to the appropriate error
+    /// code.
+    ///
+    /// ```
+    /// # extern crate libc;
+    /// # extern crate usrsctp_sys;
+    /// # use std::ptr;
+    /// # use usrsctp_sys::*;
+    /// # fn main() {
+    /// # unsafe { usrsctp_init(9899, None, None) };
+    /// let socket = unsafe {
+    ///     usrsctp_socket(libc::PF_INET6, libc::SOCK_SEQPACKET, libc::IPPROTO_SCTP,
+    ///                    None, None, 0,
+    ///                    ptr::null_mut())
+    /// };
+    /// # }
+    /// ```
+    ///
+    /// See also:
+    ///
+    /// * [`usrsctp_bind()`](fn.usrsctp_bind.html)
+    /// * [`usrsctp_close()`](fn.usrsctp_close.html)
+    /// * [`usrsctp_connect()`](fn.usrsctp_connect.html)
+    /// * [`usrsctp_listen()`](fn.usrsctp_listen.html)
+    ///
+    /// [`PF_INET`]: ../libc/constant.PF_INET.html
+    /// [`PF_INET6`]: ../libc/constant.PF_INET6.html
+    /// [`SOCK_SEQPACKET`]: ../libc/constant.SOCK_SEQPACKET.html
+    /// [`SOCK_STREAM`]: ../libc/constant.SOCK_STREAM.html
+    /// [`IPPROTO_SCTP`]: ../libc/constant.IPPROTO_SCTP.html
+    /// [RFC 6458]: http://tools.ietf.org/html/rfc6458
     pub fn usrsctp_socket(
         domain: ::std::os::raw::c_int,
-        type_: ::std::os::raw::c_int,
+        socket_type: ::std::os::raw::c_int,
         protocol: ::std::os::raw::c_int,
         receive_cb: ::std::option::Option<
             unsafe extern "C" fn(
@@ -3698,10 +3796,39 @@ extern "C" {
         infotype: *mut ::std::os::raw::c_uint,
         msg_flags: *mut ::std::os::raw::c_int,
     ) -> isize;
+
+    /// Specify with which local address and port the SCTP endpoint should
+    /// associate itself.
+    ///
+    /// * `so`: Pointer to the socket as returned by [`usrsctp_socket()`].
+    /// * `addr`: The address structure ([`sockaddr_in`] for an IPv4 address
+    ///   or [`sockaddr_in6`] for an IPv6 address.
+    /// * `addrlen`: The size of the address structure.
+    ///
+    /// Returns `0` on success or `-1` on error.
+    ///
+    /// If `so` is an IPv4 socket, the address passed must be an IPv4 address.
+    /// If the sd is an IPv6 socket, the address passed can either be an IPv4
+    /// or an IPv6 address.
+    ///
+    /// SCTP permits an endpoint to be associated with multiple addresses. (But
+    /// all addresses must be using the same local port.) See [`usrsctp_bindx()`]
+    /// for more details.
+    ///
+    /// See also:
+    ///
+    /// * [`usrsctp_bindx()`](fn.usrsctp_bindx.html)
+    /// * [`usrsctp_connect()`](fn.usrsctp_connect.html)
+    /// * [`usrsctp_listen()`](fn.usrsctp_listen.html)
+    ///
+    /// [`usrsctp_socket()`]: fn.usrsctp_socket.html
+    /// [`sockaddr_in`]: ../libc/struct.sockaddr_in.html
+    /// [`sockaddr_in6`]: ../libc/struct.sockaddr_in6.html
+    /// [`usrsctp_bindx()`]: fn.usrsctp_bindx.html
     pub fn usrsctp_bind(
         so: *mut socket,
-        name: *mut libc::sockaddr,
-        namelen: libc::socklen_t,
+        addr: *mut libc::sockaddr,
+        addrlen: libc::socklen_t,
     ) -> ::std::os::raw::c_int;
     pub fn usrsctp_bindx(
         so: *mut socket,
@@ -3709,6 +3836,8 @@ extern "C" {
         addrcnt: ::std::os::raw::c_int,
         flags: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
+
+    /// Mark a socket as being able to accept new associations.
     pub fn usrsctp_listen(so: *mut socket, backlog: ::std::os::raw::c_int)
         -> ::std::os::raw::c_int;
     pub fn usrsctp_accept(
@@ -3728,8 +3857,37 @@ extern "C" {
         addrcnt: ::std::os::raw::c_int,
         id: *mut sctp_assoc_t,
     ) -> ::std::os::raw::c_int;
+
+    /// Gracefully close down an association.
+    ///
+    /// After an application calls `usrsctp_close()` on a socket,
+    /// no further socket operations will succeed on that socket.
+    ///
+    /// * `so`: Pointer to the socket as returned by [`usrsctp_socket()`].
+    ///
+    /// See also:
+    ///
+    /// * [`usrsctp_shutdown()`](fn.usrsctp_shutdown.html)
+    ///
+    /// [`usrsctp_socket()`]: fn.usrsctp_socket.html
     pub fn usrsctp_close(so: *mut socket);
     pub fn usrsctp_getassocid(arg1: *mut socket, arg2: *mut libc::sockaddr) -> sctp_assoc_t;
+
+    /// At the end of the program `usrsctp_finish()` should be called to
+    /// free all the memory that has been allocated before.
+    ///
+    /// The return code is `0` on success and `-1` in case of an error.
+    ///
+    /// ```
+    /// # use usrsctp_sys::*;
+    /// unsafe { usrsctp_init(9899, None, None) };
+    /// // ...
+    /// unsafe { usrsctp_finish() };
+    /// ```
+    ///
+    /// See also:
+    ///
+    /// * [`usrsctp_init()`](fn.usrsctp_init.html)
     pub fn usrsctp_finish() -> ::std::os::raw::c_int;
     pub fn usrsctp_shutdown(so: *mut socket, how: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
     pub fn usrsctp_conninput(
@@ -3941,130 +4099,250 @@ fn bindgen_test_layout_sctp_timeval() {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sctpstat {
+    /// SCTP MIB, RFC 3873: sctpStats 18: TimeStamp
     pub sctps_discontinuitytime: sctp_timeval,
+    /// SCTP MIB, RFC 3873: sctpStats 1: Gauge32
     pub sctps_currestab: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 2: Counter32
     pub sctps_activeestab: u32,
     pub sctps_restartestab: u32,
     pub sctps_collisionestab: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 3: Counter32
     pub sctps_passiveestab: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 4: Counter32
     pub sctps_aborted: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 5: Counter32
     pub sctps_shutdown: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 6: Counter32
     pub sctps_outoftheblue: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 7: Counter32
     pub sctps_checksumerrors: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 8: Counter64
     pub sctps_outcontrolchunks: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 9: Counter64
     pub sctps_outorderchunks: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 10: Counter64
     pub sctps_outunorderchunks: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 11: Counter64
     pub sctps_incontrolchunks: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 12: Counter64
     pub sctps_inorderchunks: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 13: Counter64
     pub sctps_inunorderchunks: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 14: Counter64
     pub sctps_fragusrmsgs: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 15: Counter64
     pub sctps_reasmusrmsgs: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 16: Counter64
     pub sctps_outpackets: u32,
+    /// SCTP MIB, RFC 3873: sctpStats 17: Counter64
     pub sctps_inpackets: u32,
+    /// Total input packets.
     pub sctps_recvpackets: u32,
+    /// Total input datagrams.
     pub sctps_recvdatagrams: u32,
+    /// Total input packets that had data.
     pub sctps_recvpktwithdata: u32,
+    /// Total input SACK chunks.
     pub sctps_recvsacks: u32,
+    /// Total input DATA chunks.
     pub sctps_recvdata: u32,
+    /// Total input duplicate DATA chunks.
     pub sctps_recvdupdata: u32,
+    /// Total input heartbeat (HB) chunks.
     pub sctps_recvheartbeat: u32,
+    /// Total input heartbeat acknowledgement (HB-ACK) chunks.
     pub sctps_recvheartbeatack: u32,
+    /// Total input ECNE chunks.
     pub sctps_recvecne: u32,
+    /// Total input AUTH chunks.
     pub sctps_recvauth: u32,
+    /// Total input chunks missing AUTH.
     pub sctps_recvauthmissing: u32,
+    /// Total number of invalid HMAC ids received.
     pub sctps_recvivalhmacid: u32,
+    /// Total number of invalid secret ids received.
     pub sctps_recvivalkeyid: u32,
+    /// Total number of auth failed.
     pub sctps_recvauthfailed: u32,
+    /// Total fast path receives all one chunk.
     pub sctps_recvexpress: u32,
+    /// Total fast path multi-part data.
     pub sctps_recvexpressm: u32,
+    /// Unused. Previously `sctps_recvnocrc`.
     pub sctps_recv_spare: u32,
     pub sctps_recvswcrc: u32,
     pub sctps_recvhwcrc: u32,
+    /// Total output packets.
     pub sctps_sendpackets: u32,
+    /// Total output SACKs.
     pub sctps_sendsacks: u32,
+    /// Total output DATA chunks.
     pub sctps_senddata: u32,
+    /// Total output retransmitted DATA chunks.
     pub sctps_sendretransdata: u32,
+    /// Total output fast retransmitted DATA chunks.
     pub sctps_sendfastretrans: u32,
+    /// Total FR's that happened more than once to same chunk.
     pub sctps_sendmultfastretrans: u32,
+    /// Total output heartbeat (HR) chunks.
     pub sctps_sendheartbeat: u32,
+    /// Total output ECNE chunks.
     pub sctps_sendecne: u32,
+    /// Total output AUTH chunks.
     pub sctps_sendauth: u32,
+    /// io_output error counter.
     pub sctps_senderrors: u32,
+    /// Unused. Previously `sctps_sendnocrc`.
     pub sctps_send_spare: u32,
     pub sctps_sendswcrc: u32,
     pub sctps_sendhwcrc: u32,
+    /// Packet drop from middle box.
     pub sctps_pdrpfmbox: u32,
+    /// Packet drop from end host.
     pub sctps_pdrpfehos: u32,
+    /// Packet drops with data.
     pub sctps_pdrpmbda: u32,
+    /// Packet drops, non-data, non-endhost.
     pub sctps_pdrpmbct: u32,
+    /// Packet drops, non-endhost, bandwidth rep only.
     pub sctps_pdrpbwrpt: u32,
+    /// Packet drops, not enough for chunk header.
     pub sctps_pdrpcrupt: u32,
+    /// Packet drops, not enough data to confirm.
     pub sctps_pdrpnedat: u32,
+    /// Packet drops, where process_chunk_drop said break.
     pub sctps_pdrppdbrk: u32,
+    /// Packet drop, could not find TSN.
     pub sctps_pdrptsnnf: u32,
+    /// Packet drop, attempt reverse TSN lookup.
     pub sctps_pdrpdnfnd: u32,
+    /// Packet drop, end host confirms zero rwnd.
     pub sctps_pdrpdiwnp: u32,
+    /// Packet drop, middle box confirms no space.
     pub sctps_pdrpdizrw: u32,
+    /// Packet drop, data did not match TSN.
     pub sctps_pdrpbadd: u32,
+    /// Packet drop, TNS's marked for Fast Retran.
     pub sctps_pdrpmark: u32,
+    /// Number of iterator timers that fired.
     pub sctps_timoiterator: u32,
+    /// Number of T3 data time outs.
     pub sctps_timodata: u32,
+    /// Number of window probe (T3) timers that fired.
     pub sctps_timowindowprobe: u32,
+    /// Number of INIT timers that fired.
     pub sctps_timoinit: u32,
+    /// Number of SACK timers that fired.
     pub sctps_timosack: u32,
+    /// Number of shutdown timers that fired.
     pub sctps_timoshutdown: u32,
+    /// Number of heartbeat timers that fired.
     pub sctps_timoheartbeat: u32,
+    /// Number of times a cookie timeout fired.
     pub sctps_timocookie: u32,
+    /// Number of times an endpoint changed its cookie secret.
     pub sctps_timosecret: u32,
+    /// Number of PMTU timers that fired.
     pub sctps_timopathmtu: u32,
+    /// Number of shutdown ack timers that fired.
     pub sctps_timoshutdownack: u32,
+    /// Number of shutdown guard timers that fired.
     pub sctps_timoshutdownguard: u32,
+    /// Number of stream reset timers that fired.
     pub sctps_timostrmrst: u32,
+    /// Number of early FR timers that fired.
     pub sctps_timoearlyfr: u32,
+    /// Number fo times an asconf timer fired.
     pub sctps_timoasconf: u32,
+    /// Number of times a prim_deleted timer fired.
     pub sctps_timodelprim: u32,
+    /// Number of times auto close timer fired.
     pub sctps_timoautoclose: u32,
+    /// Number of asoc free timers expired.
     pub sctps_timoassockill: u32,
+    /// Number of inp free timers expected.
     pub sctps_timoinpkill: u32,
+    /// Unused, previously early FR counters.
     pub sctps_spare: [u32; 11usize],
+    /// Packets shorter than header.
     pub sctps_hdrops: u32,
+    /// Checksum error.
     pub sctps_badsum: u32,
+    /// No endpoint for port.
     pub sctps_noport: u32,
+    /// Bad v-tag.
     pub sctps_badvtag: u32,
+    /// Bad SID.
     pub sctps_badsid: u32,
+    /// No memory.
     pub sctps_nomem: u32,
+    /// Number of multiple FR in a RTT window.
     pub sctps_fastretransinrtt: u32,
     pub sctps_markedretrans: u32,
+    /// Nagle allowed sending.
     pub sctps_naglesent: u32,
+    /// Nagle doesn't allow sending.
     pub sctps_naglequeued: u32,
+    /// Max burst doesn't allow sending.
     pub sctps_maxburstqueued: u32,
+    /// Look ahead tells us no memory in interface ring buffer OR we
+    /// had a send error and are queuing one send.
     pub sctps_ifnomemqueued: u32,
+    /// Total number of window probes sent.
     pub sctps_windowprobed: u32,
+    /// Total times an output error causes us to clamp down on next user send.
     pub sctps_lowlevelerr: u32,
+    /// Total times `sctp_senderrors` were caused from a user invoked
+    /// send not a sack response.
     pub sctps_lowlevelerrusr: u32,
+    /// Number of in data drops due to chunk limit reached.
     pub sctps_datadropchklmt: u32,
+    /// Number of in data drops due to rwnd limit reached.
     pub sctps_datadroprwnd: u32,
+    /// Number of times ECN reduced the cwnd.
     pub sctps_ecnereducedcwnd: u32,
+    /// Used express lookup via vtag.
     pub sctps_vtagexpress: u32,
+    /// Collision in express lookup.
     pub sctps_vtagbogus: u32,
+    /// Number of times the sender ran dry of user data on primary.
     pub sctps_primary_randry: u32,
+    /// Same for above.
     pub sctps_cmt_randry: u32,
+    /// Sacks the slow way.
     pub sctps_slowpath_sack: u32,
+    /// Window update only sacks sent.
     pub sctps_wu_sacks_sent: u32,
+    /// Number of sends with `sinfo_flags != 0`.
     pub sctps_sends_with_flags: u32,
+    /// Number of unordered sends.
     pub sctps_sends_with_unord: u32,
+    /// Number of sends with EOF flag set.
     pub sctps_sends_with_eof: u32,
+    /// Number of sends with ABORT flag set.
     pub sctps_sends_with_abort: u32,
+    /// Number of times protocol drain called.
     pub sctps_protocol_drain_calls: u32,
+    /// Number of times we did a protocol drain.
     pub sctps_protocol_drains_done: u32,
+    /// Number of times recv was called with peek.
     pub sctps_read_peeks: u32,
+    /// Number of cached chunks used.
     pub sctps_cached_chk: u32,
+    /// Number of cached stream oq's used.
     pub sctps_cached_strmoq: u32,
+    /// Number of unread messages abandoned by close.
     pub sctps_left_abandon: u32,
+    /// Unused.
     pub sctps_send_burst_avoid: u32,
+    /// Send cwnf full avoidance, already max burst inflight to net.
     pub sctps_send_cwnd_avoid: u32,
+    /// Number of map array over-runs via fwd-tsn's.
     pub sctps_fwdtsn_map_over: u32,
+    /// Number of times we queued or updated an ECN chunk on send queue.
     pub sctps_queue_upd_ecne: u32,
+    /// Future ABI compat. Items will be removed from here when adding new stats.
     pub sctps_reserved: [u32; 31usize],
 }
 #[test]

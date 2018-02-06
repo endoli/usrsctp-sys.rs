@@ -17,7 +17,7 @@ loss of data and duplication of data is achieved by using checksums
 and sequence numbers. A selective retransmission mechanism is
 applied to correct loss or corruption of data.
 
-This library provides bindings for the `usrsctp` implementation
+This library provides bindings for the [`usrsctp` implementation](https://github.com/sctplab/usrsctp)
 of SCTP.
 
 ## Documentation
